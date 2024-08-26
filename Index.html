@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spin Wheel App</title>
+    <base target="_top">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #ecf0f1;
+            --text-color: #34495e;
+            --border-radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        h2,
+        h3 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #wheelContainer {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        #wheel {
+            width: 100%;
+            height: auto;
+        }
+
+        #wheelArrow {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid red;
+            z-index: 10;
+        }
+
+        #spinButton {
+            width: auto;
+            padding: 10px 20px;
+            font-size: 18px;
+            margin: 20px auto;
+            display: block;
+        }
+
+        #result {
+            text-align: center;
+            font-size: 24px;
+            margin-top: 20px;
+            font-weight: bold;
+            color: var(--secondary-color);
+        }
+
+        #recentWins {
+            list-style-type: none;
+            padding: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        #recentWins li {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: var(--border-radius);
+            padding: 10px;
+            margin-bottom: 10px;
+            transition: background-color 0.3s ease;
+        }
+
+        #recentWins li:hover {
+            background-color: #e9ecef;
+        }
+
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            #wheelContainer {
+                max-width: 400px;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .container {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            #spinWheel {
+                grid-column: span 2;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="loginForm" class="card">
+            <h2>Login</h2>
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="login()">Login</button>
+        </div>
+
+        <div id="spinWheel" class="card" style="display:none;">
+            <h2>Spin Wheel</h2>
+            <div id="wheelContainer">
+                <canvas id="wheel"></canvas>
+                <div id="wheelArrow"></div>
+            </div>
+            <button onclick="spin()" id="spinButton">Spin</button>
+            <div id="result"></div>
+        </div>
+
+        <div id="dashboard" class="card" style="display:none;">
+            <h2>Dashboard</h2>
+            <h3>Recent Spins</h3>
+            <ul id="recentWins"></ul>
+        </div>
+    </div>
+
+    <script>
+
+        let wheel;
+        let options = [];
+        let currentUser = '';
+        let isSpinning = false;
+        const SPIN_DURATION = 5000; // 5 seconds spin duration
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            google.script.run.withSuccessHandler(onLoginSuccess).withFailureHandler(onFailure).checkLogin(username, password);
+        }
+
+        function onLoginSuccess(result) {
+            if (result.success) {
+                currentUser = document.getElementById('username').value;
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('spinWheel').style.display = 'block';
+                document.getElementById('dashboard').style.display = 'block';
+                loadSpinOptions();
+                loadRecentWins();
+            } else {
+                alert('Invalid username or password');
+            }
+        }
+
+        function loadSpinOptions() {
+            google.script.run.withSuccessHandler(setupWheel).getSpinOptions();
+        }
+
+        function setupWheel(spinOptions) {
+            options = spinOptions;
+            const ctx = document.getElementById('wheel').getContext('2d');
+            const segmentCount = options.length;
+
+            // Reverse the options to match the visual rotation direction
+            const reversedOptions = options.slice().reverse();
+
+            if (wheel) {
+                wheel.destroy();
+            }
+
+            wheel = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: reversedOptions.map(opt => opt.name),
+                    datasets: [{
+                        data: new Array(segmentCount).fill(1), // Equal size for all segments
+                        backgroundColor: generateColors(segmentCount),
+                        borderColor: 'white',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    animation: { duration: 0 },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false },
+                    },
+                    rotation: 270 + (360 / (2 * segmentCount)),
+                },
+                plugins: [{
+                    id: 'textInSlice',
+                    afterDraw: (chart) => {
+                        const ctx = chart.ctx;
+                        chart.data.datasets.forEach((dataset, datasetIndex) => {
+                            const meta = chart.getDatasetMeta(datasetIndex);
+                            if (!meta.hidden) {
+                                meta.data.forEach((element, index) => {
+                                    const text = chart.data.labels[index];
+                                    ctx.font = 'bold 14px Arial';
+                                    ctx.fillStyle = 'black';
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'middle';
+                                    const midAngle = element.startAngle + (element.endAngle - element.startAngle) / 2;
+                                    const radius = element.outerRadius * 0.7;
+                                    const x = element.x + Math.cos(midAngle) * radius;
+                                    const y = element.y + Math.sin(midAngle) * radius;
+                                    ctx.fillText(text, x, y);
+                                });
+                            }
+                        });
+                    }
+                }]
+            });
+        }
+
+        function generateColors(count) {
+            return [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                '#FF9F40', '#00FFFF', '#32CD32', '#FF1493', '#8B4513'
+            ].slice(0, count);
+        }
+
+        function weightedRandomSelect(options) {
+            const totalWeight = options.reduce((sum, option) => sum + option.probability, 0);
+            let randomValue = Math.random() * totalWeight;
+
+            for (let i = 0; i < options.length; i++) {
+                randomValue -= options[i].probability;
+                if (randomValue <= 0) {
+                    return i;
+                }
+            }
+            return options.length - 1; // Fallback to last option
+        }
+
+        function spin() {
+            if (isSpinning) return;
+
+            isSpinning = true;
+            document.getElementById('spinButton').disabled = true;
+            document.getElementById('result').innerText = ''; // Clear previous result
+
+            // Fetch the latest spin options before spinning
+            google.script.run.withSuccessHandler(function (latestOptions) {
+                options = latestOptions;
+                setupWheel(options);
+                performSpin();
+            }).getSpinOptions();
+        }
+
+        function performSpin() {
+            // Determine winning segment based on probabilities
+            const winningIndex = weightedRandomSelect(options);
+            const result = options[winningIndex].name;
+
+            // Calculate stopping angle
+            const segmentAngle = 360 / options.length;
+            const minAngle = winningIndex * segmentAngle;
+            const maxAngle = (winningIndex + 1) * segmentAngle;
+            const stopAngle = minAngle + (Math.random() * (maxAngle - minAngle));
+
+            // Calculate total rotation (including extra spins)
+            const extraSpins = 5; // Number of extra full rotations
+            const finalAngle = (360 * extraSpins) + stopAngle;
+
+            // Animate the wheel
+            let currentRotation = 0;
+            const animationDuration = 5000; // 5 seconds
+            const startTime = Date.now();
+
+            function animateWheel() {
+                const elapsedTime = Date.now() - startTime;
+                const progress = Math.min(elapsedTime / animationDuration, 1);
+                currentRotation = easeOutQuart(progress) * finalAngle;
+
+                wheel.options.rotation = currentRotation;
+                wheel.update();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateWheel);
+                } else {
+                    // Animation complete
+                    document.getElementById('result').innerText = `You won: ${result}`;
+                    google.script.run.recordSpin(currentUser, result);
+                    isSpinning = false;
+                    document.getElementById('spinButton').disabled = false;
+                    loadRecentWins();
+                }
+            }
+
+            animateWheel();
+        }
+
+        // Easing function for smooth deceleration
+        function easeOutQuart(t) {
+            return 1 - (--t) * t * t * t;
+        }
+
+        function loadRecentWins() {
+            google.script.run
+                .withSuccessHandler(function (result) {
+                    console.log("Received recent spins data:", result);
+                    displayRecentWins(result);
+                })
+                .withFailureHandler(function (error) {
+                    console.error("Error fetching recent spins:", error);
+                    displayRecentWins(null);
+                })
+                .getRecentWins();
+        }
+
+        function displayRecentWins(spins) {
+            const list = document.getElementById('recentWins');
+            list.innerHTML = '';  // Clear the list before appending new data
+
+            if (!spins || spins.length === 0) {
+                const li = document.createElement('li');
+                li.innerText = 'No recent spins to display.';
+                list.appendChild(li);
+                return;
+            }
+
+            spins.forEach(spin => {
+                const li = document.createElement('li');
+                li.style.padding = '10px';
+                li.style.marginBottom = '5px';
+                li.style.border = '1px solid #ddd';
+                li.style.borderRadius = '5px';
+                li.style.backgroundColor = '#f9f9f9';
+
+                li.innerHTML = `
+                    <strong>User:</strong> ${spin[0]}<br>
+                    <strong>Result:</strong> ${spin[2]}<br>
+                    <strong>Date:</strong> ${spin[1]}
+                `;
+
+                list.appendChild(li);
+            });
+        }
+
+        function onFailure(error) {
+            console.error(error);
+            alert('An error occurred. Please try again.');
+        }
+    </script>
+</body>
+
+</html>

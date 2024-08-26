@@ -194,13 +194,28 @@
     </div>
 
     <script>
-
         let wheel;
         let options = [];
         let currentUser = '';
         let isSpinning = false;
+        let localOptions = [];
+        let pendingOptions = false;
         const SPIN_DURATION = 5000; // 5 seconds spin duration
 
+        function initializeSpinWheel() {
+            loadSpinOptions();
+            startBackgroundUpdate();
+            google.script.run
+                .withSuccessHandler(function (spinOptions) {
+                    localOptions = spinOptions;
+                    setupWheel(localOptions);
+
+                })
+                .withFailureHandler(function (error) {
+                    console.error("Failed to load spin options:", error);
+                })
+                .getSpinOptions();
+        }
         function login() {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
@@ -213,7 +228,7 @@
                 document.getElementById('loginForm').style.display = 'none';
                 document.getElementById('spinWheel').style.display = 'block';
                 document.getElementById('dashboard').style.display = 'block';
-                loadSpinOptions();
+                initializeSpinWheel();
                 loadRecentWins();
             } else {
                 alert('Invalid username or password');
@@ -221,8 +236,26 @@
         }
 
         function loadSpinOptions() {
-            google.script.run.withSuccessHandler(setupWheel).getSpinOptions();
+            google.script.run
+                .withSuccessHandler(function (spinOptions) {
+                    if (localOptions != spinOptions) {
+
+                        pendingOptions = true;
+                        localOptions = spinOptions;
+                    }
+
+                })
+                .withFailureHandler(function (error) {
+                    console.error("Failed to load spin options:", error);
+                })
+                .getSpinOptions();
         }
+
+        function startBackgroundUpdate() {
+            // Update every 5 seconds
+            setInterval(loadSpinOptions, 1000);
+        }
+
 
         function setupWheel(spinOptions) {
             options = spinOptions;
@@ -252,7 +285,7 @@
                     animation: { duration: 0 },
                     plugins: {
                         legend: { display: false },
-                        tooltip: { enabled: false },
+                        tooltip: { enabled: true },
                     },
                     rotation: 270 + (360 / (2 * segmentCount)),
                 },
@@ -307,20 +340,21 @@
 
             isSpinning = true;
             document.getElementById('spinButton').disabled = true;
-            document.getElementById('result').innerText = ''; // Clear previous result
+            document.getElementById('result').innerText = '';
 
-            // Fetch the latest spin options before spinning
-            google.script.run.withSuccessHandler(function (latestOptions) {
-                options = latestOptions;
-                setupWheel(options);
-                performSpin();
-            }).getSpinOptions();
+            // Apply any pending updates
+            if (pendingOptions) {
+
+                setupWheel(localOptions);
+                pendingOptions = false;
+            }
+
+            performSpin();
         }
 
         function performSpin() {
-            // Determine winning segment based on probabilities
-            const winningIndex = weightedRandomSelect(options);
-            const result = options[winningIndex].name;
+            const winningIndex = weightedRandomSelect(localOptions);
+            const result = localOptions[winningIndex].name;
 
             // Calculate stopping angle
             const segmentAngle = 360 / options.length;
@@ -351,14 +385,22 @@
                     // Animation complete
                     document.getElementById('result').innerText = `You won: ${result}`;
                     google.script.run.recordSpin(currentUser, result);
-                    isSpinning = false;
-                    document.getElementById('spinButton').disabled = false;
-                    loadRecentWins();
+                    finishSpin();
                 }
             }
 
             animateWheel();
         }
+
+
+        function finishSpin() {
+            isSpinning = false;
+            document.getElementById('spinButton').disabled = false;
+            loadRecentWins();
+
+
+        }
+
 
         // Easing function for smooth deceleration
         function easeOutQuart(t) {

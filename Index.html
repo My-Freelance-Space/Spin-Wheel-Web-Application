@@ -187,6 +187,49 @@
                 grid-column: span 2;
             }
         }
+
+        .spin-time-button {
+            background-color: #3498db;
+        }
+
+        .dialog {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .dialog-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 300px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .dialog-content h2 {
+            margin-top: 0;
+        }
+
+        .dialog-content input {
+            width: 100%;
+            padding: 5px;
+            margin: 10px 0;
+        }
+
+        .dialog-buttons {
+            margin-top: 20px;
+        }
+
+        .dialog-buttons button {
+            margin: 0 10px;
+        }
     </style>
 
 
@@ -214,6 +257,7 @@
             <div class="control-buttons">
                 <button onclick="toggleSlowSpin()" id="slowSpinButton" class="toggle-button">Slow Spin</button>
                 <button onclick="reorderOptions()" class="reorder-button">Reorder Options</button>
+                <button onclick="openSpinTimeDialog()" class="spin-time-button">Set Spin Time</button>
             </div>
         </div>
 
@@ -221,6 +265,19 @@
             <h2>Dashboard</h2>
             <h3>Recent Spins</h3>
             <ul id="recentWins"></ul>
+        </div>
+    </div>
+
+
+    <div id="spinTimeDialog" class="dialog">
+        <div class="dialog-content">
+            <h2>Set Spin Time</h2>
+            <p>Enter the desired spin duration in seconds:</p>
+            <input type="number" id="spinTimeInput" min="10" max="60" value="10">
+            <div class="dialog-buttons">
+                <button onclick="setSpinTime()">Set</button>
+                <button onclick="closeSpinTimeDialog()">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -233,7 +290,8 @@
     let shuffledOptions = [];
     let isShuffled = false;
     let slowSpinInterval;
-    const SPIN_DURATION = 10000; // 10 seconds spin duration
+    let SPIN_DURATION = 10000;  // 10 seconds spin duration
+    const DECELERATION_TIME = 5000; // 5 seconds of deceleration
 
     function initializeSpinWheel() {
         loadSpinOptions();
@@ -438,7 +496,7 @@
         const stopAngle = minAngle + (Math.random() * (maxAngle - minAngle));
 
         // Calculate total rotation (including extra spins)
-        const extraSpins = 5; // Number of extra full rotations
+        const extraSpins = 60; // Number of extra full rotations
         const finalAngle = (360 * extraSpins) + stopAngle;
 
         // Animate the wheel
@@ -523,6 +581,28 @@
         console.error(error);
         alert('An error occurred. Please try again.');
     }
+
+
+    function openSpinTimeDialog() {
+        document.getElementById('spinTimeDialog').style.display = 'block';
+        document.getElementById('spinTimeInput').value = SPIN_DURATION / 1000;
+    }
+
+    function closeSpinTimeDialog() {
+        document.getElementById('spinTimeDialog').style.display = 'none';
+    }
+
+    function setSpinTime() {
+        const spinTime = document.getElementById('spinTimeInput').value;
+        if (spinTime >= 10 && spinTime <= 60) {
+            SPIN_DURATION = spinTime * 1000; // Convert to milliseconds
+            closeSpinTimeDialog();
+            alert(`Spin time set to ${spinTime} seconds.`);
+        } else {
+            alert('Please enter a value between 10 and 60 seconds.');
+        }
+    }
+
 </script>
 </body>
 

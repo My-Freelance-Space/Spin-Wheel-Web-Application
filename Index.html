@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+
     <style>
         :root {
             --primary-color: #3498db;
@@ -35,8 +36,8 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr;
+            display: flex;
+            flex-direction: column;
             gap: 20px;
         }
 
@@ -52,14 +53,13 @@
             transform: translateY(-5px);
         }
 
-        h2,
-        h3 {
+        h2, h3 {
             color: var(--primary-color);
             margin-bottom: 20px;
+            text-align: center;
         }
 
-        input[type="text"],
-        input[type="password"] {
+        input[type="text"], input[type="password"] {
             width: 100%;
             padding: 10px;
             margin-bottom: 10px;
@@ -69,25 +69,35 @@
         }
 
         button {
-            width: 100%;
-            padding: 10px;
+            padding: 10px 20px;
             background-color: var(--primary-color);
             color: white;
             border: none;
             border-radius: var(--border-radius);
             cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
+            font-size: 14px;
+            transition: background-color 0.3s ease, transform 0.1s ease;
         }
 
         button:hover {
             background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #spinWheel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         #wheelContainer {
             position: relative;
             width: 100%;
-            max-width: 300px;
+            max-width: 400px;
             margin: 0 auto;
         }
 
@@ -109,20 +119,47 @@
             z-index: 10;
         }
 
-        #spinButton {
-            width: auto;
-            padding: 10px 20px;
-            font-size: 18px;
-            margin: 20px auto;
-            display: block;
-        }
-
         #result {
             text-align: center;
             font-size: 24px;
-            margin-top: 20px;
+            margin: 20px 0;
             font-weight: bold;
             color: var(--secondary-color);
+            min-height: 36px;
+        }
+
+        .control-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        #spinButton {
+            background-color: #e74c3c;
+            font-size: 18px;
+            padding: 12px 24px;
+        }
+
+        #spinButton:hover {
+            background-color: #c0392b;
+        }
+
+        .toggle-button {
+            background-color: #f39c12;
+        }
+
+        .toggle-button.active {
+            background-color: #e67e22;
+        }
+
+        .reorder-button {
+            background-color: #9b59b6;
+        }
+
+        .reorder-button:hover {
+            background-color: #8e44ad;
         }
 
         #recentWins {
@@ -146,25 +183,13 @@
         }
 
         @media (min-width: 768px) {
-            .container {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            #wheelContainer {
-                max-width: 400px;
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .container {
-                grid-template-columns: repeat(3, 1fr);
-            }
-
             #spinWheel {
                 grid-column: span 2;
             }
         }
     </style>
+
+
 </head>
 
 <body>
@@ -182,8 +207,14 @@
                 <canvas id="wheel"></canvas>
                 <div id="wheelArrow"></div>
             </div>
-            <button onclick="spin()" id="spinButton">Spin</button>
             <div id="result"></div>
+            <div class="control-buttons">
+                <button onclick="spin()" id="spinButton">Spin</button>
+            </div>
+            <div class="control-buttons">
+                <button onclick="toggleSlowSpin()" id="slowSpinButton" class="toggle-button">Slow Spin</button>
+                <button onclick="reorderOptions()" class="reorder-button">Reorder Options</button>
+            </div>
         </div>
 
         <div id="dashboard" class="card" style="display:none;">
@@ -193,267 +224,306 @@
         </div>
     </div>
 
-    <script>
-        let wheel;
-        let options = [];
-        let currentUser = '';
-        let isSpinning = false;
-        let localOptions = [];
-        let pendingOptions = false;
-        const SPIN_DURATION = 5000; // 5 seconds spin duration
+<script>
+    let wheel;
+    let options = [];
+    let currentUser = '';
+    let isSpinning = false;
+    let originalOptions = [];
+    let shuffledOptions = [];
+    let isShuffled = false;
+    let slowSpinInterval;
+    const SPIN_DURATION = 10000; // 10 seconds spin duration
 
-        function initializeSpinWheel() {
-            loadSpinOptions();
-            startBackgroundUpdate();
-            google.script.run
-                .withSuccessHandler(function (spinOptions) {
-                    localOptions = spinOptions;
-                    setupWheel(localOptions);
+    function initializeSpinWheel() {
+        loadSpinOptions();
+        startBackgroundUpdate();
+    }
 
-                })
-                .withFailureHandler(function (error) {
-                    console.error("Failed to load spin options:", error);
-                })
-                .getSpinOptions();
-        }
-        function login() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            google.script.run.withSuccessHandler(onLoginSuccess).withFailureHandler(onFailure).checkLogin(username, password);
-        }
+    function login() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        google.script.run.withSuccessHandler(onLoginSuccess).withFailureHandler(onFailure).checkLogin(username, password);
+    }
 
-        function onLoginSuccess(result) {
-            if (result.success) {
-                currentUser = document.getElementById('username').value;
-                document.getElementById('loginForm').style.display = 'none';
-                document.getElementById('spinWheel').style.display = 'block';
-                document.getElementById('dashboard').style.display = 'block';
-                initializeSpinWheel();
-                loadRecentWins();
-            } else {
-                alert('Invalid username or password');
-            }
-        }
-
-        function loadSpinOptions() {
-            google.script.run
-                .withSuccessHandler(function (spinOptions) {
-                    if (localOptions != spinOptions) {
-
-                        pendingOptions = true;
-                        localOptions = spinOptions;
-                    }
-
-                })
-                .withFailureHandler(function (error) {
-                    console.error("Failed to load spin options:", error);
-                })
-                .getSpinOptions();
-        }
-
-        function startBackgroundUpdate() {
-            // Update every 5 seconds
-            setInterval(loadSpinOptions, 1000);
-        }
-
-
-        function setupWheel(spinOptions) {
-            options = spinOptions;
-            const ctx = document.getElementById('wheel').getContext('2d');
-            const segmentCount = options.length;
-
-            // Reverse the options to match the visual rotation direction
-            const reversedOptions = options.slice().reverse();
-
-            if (wheel) {
-                wheel.destroy();
-            }
-
-            wheel = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: reversedOptions.map(opt => opt.name),
-                    datasets: [{
-                        data: new Array(segmentCount).fill(1), // Equal size for all segments
-                        backgroundColor: generateColors(segmentCount),
-                        borderColor: 'white',
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    animation: { duration: 0 },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { enabled: true },
-                    },
-                    rotation: 270 + (360 / (2 * segmentCount)),
-                },
-                plugins: [{
-                    id: 'textInSlice',
-                    afterDraw: (chart) => {
-                        const ctx = chart.ctx;
-                        chart.data.datasets.forEach((dataset, datasetIndex) => {
-                            const meta = chart.getDatasetMeta(datasetIndex);
-                            if (!meta.hidden) {
-                                meta.data.forEach((element, index) => {
-                                    const text = chart.data.labels[index];
-                                    ctx.font = 'bold 14px Arial';
-                                    ctx.fillStyle = 'black';
-                                    ctx.textAlign = 'center';
-                                    ctx.textBaseline = 'middle';
-                                    const midAngle = element.startAngle + (element.endAngle - element.startAngle) / 2;
-                                    const radius = element.outerRadius * 0.7;
-                                    const x = element.x + Math.cos(midAngle) * radius;
-                                    const y = element.y + Math.sin(midAngle) * radius;
-                                    ctx.fillText(text, x, y);
-                                });
-                            }
-                        });
-                    }
-                }]
-            });
-        }
-
-        function generateColors(count) {
-            return [
-                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-                '#FF9F40', '#00FFFF', '#32CD32', '#FF1493', '#8B4513'
-            ].slice(0, count);
-        }
-
-        function weightedRandomSelect(options) {
-            const totalWeight = options.reduce((sum, option) => sum + option.probability, 0);
-            let randomValue = Math.random() * totalWeight;
-
-            for (let i = 0; i < options.length; i++) {
-                randomValue -= options[i].probability;
-                if (randomValue <= 0) {
-                    return i;
-                }
-            }
-            return options.length - 1; // Fallback to last option
-        }
-
-        function spin() {
-            if (isSpinning) return;
-
-            isSpinning = true;
-            document.getElementById('spinButton').disabled = true;
-            document.getElementById('result').innerText = '';
-
-            // Apply any pending updates
-            if (pendingOptions) {
-
-                setupWheel(localOptions);
-                pendingOptions = false;
-            }
-
-            performSpin();
-        }
-
-        function performSpin() {
-            const winningIndex = weightedRandomSelect(localOptions);
-            const result = localOptions[winningIndex].name;
-
-            // Calculate stopping angle
-            const segmentAngle = 360 / options.length;
-            const minAngle = winningIndex * segmentAngle;
-            const maxAngle = (winningIndex + 1) * segmentAngle;
-            const stopAngle = minAngle + (Math.random() * (maxAngle - minAngle));
-
-            // Calculate total rotation (including extra spins)
-            const extraSpins = 5; // Number of extra full rotations
-            const finalAngle = (360 * extraSpins) + stopAngle;
-
-            // Animate the wheel
-            let currentRotation = 0;
-            const animationDuration = 5000; // 5 seconds
-            const startTime = Date.now();
-
-            function animateWheel() {
-                const elapsedTime = Date.now() - startTime;
-                const progress = Math.min(elapsedTime / animationDuration, 1);
-                currentRotation = easeOutQuart(progress) * finalAngle;
-
-                wheel.options.rotation = currentRotation;
-                wheel.update();
-
-                if (progress < 1) {
-                    requestAnimationFrame(animateWheel);
-                } else {
-                    // Animation complete
-                    document.getElementById('result').innerText = `You won: ${result}`;
-                    google.script.run.recordSpin(currentUser, result);
-                    finishSpin();
-                }
-            }
-
-            animateWheel();
-        }
-
-
-        function finishSpin() {
-            isSpinning = false;
-            document.getElementById('spinButton').disabled = false;
+    function onLoginSuccess(result) {
+        if (result.success) {
+            currentUser = document.getElementById('username').value;
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('spinWheel').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'block';
+            initializeSpinWheel();
             loadRecentWins();
-
-
+        } else {
+            alert('Invalid username or password');
         }
+    }
 
+    function loadSpinOptions() {
+        google.script.run
+            .withSuccessHandler(function (spinOptions) {
+                if (JSON.stringify(originalOptions) !== JSON.stringify(spinOptions)) {
+                    originalOptions = spinOptions;
+                    updateWheel(spinOptions);
+                }
+            })
+            .withFailureHandler(function (error) {
+                console.error("Failed to load spin options:", error);
+            })
+            .getSpinOptions();
+    }
 
-        // Easing function for smooth deceleration
-        function easeOutQuart(t) {
-            return 1 - (--t) * t * t * t;
-        }
+    function updateWheel(newOptions) {
+        if (!isShuffled) {
+            shuffledOptions = [...newOptions];
+        } else {
+            // Attempt to maintain shuffle order while updating options and probabilities
+            const newShuffledOptions = [];
+            const remainingNewOptions = [...newOptions];
 
-        function loadRecentWins() {
-            google.script.run
-                .withSuccessHandler(function (result) {
-                    console.log("Received recent spins data:", result);
-                    displayRecentWins(result);
-                })
-                .withFailureHandler(function (error) {
-                    console.error("Error fetching recent spins:", error);
-                    displayRecentWins(null);
-                })
-                .getRecentWins();
-        }
-
-        function displayRecentWins(spins) {
-            const list = document.getElementById('recentWins');
-            list.innerHTML = '';  // Clear the list before appending new data
-
-            if (!spins || spins.length === 0) {
-                const li = document.createElement('li');
-                li.innerText = 'No recent spins to display.';
-                list.appendChild(li);
-                return;
-            }
-
-            spins.forEach(spin => {
-                const li = document.createElement('li');
-                li.style.padding = '10px';
-                li.style.marginBottom = '5px';
-                li.style.border = '1px solid #ddd';
-                li.style.borderRadius = '5px';
-                li.style.backgroundColor = '#f9f9f9';
-
-                li.innerHTML = `
-                    <strong>User:</strong> ${spin[0]}<br>
-                    <strong>Result:</strong> ${spin[2]}<br>
-                    <strong>Date:</strong> ${spin[1]}
-                `;
-
-                list.appendChild(li);
+            // First, keep existing options in their current order, updating probabilities
+            shuffledOptions.forEach(option => {
+                const newOptionIndex = remainingNewOptions.findIndex(o => o.name === option.name);
+                if (newOptionIndex !== -1) {
+                    newShuffledOptions.push(remainingNewOptions[newOptionIndex]);
+                    remainingNewOptions.splice(newOptionIndex, 1);
+                }
             });
+
+            // Then, add any new options to the end
+            newShuffledOptions.push(...remainingNewOptions);
+
+            shuffledOptions = newShuffledOptions;
         }
 
-        function onFailure(error) {
-            console.error(error);
-            alert('An error occurred. Please try again.');
+        setupWheel(shuffledOptions);
+    }
+
+    function startBackgroundUpdate() {
+        // Update every 5 seconds
+        setInterval(loadSpinOptions, 1000);
+    }
+
+    function setupWheel(spinOptions) {
+        options = spinOptions;
+        const ctx = document.getElementById('wheel').getContext('2d');
+        const segmentCount = options.length;
+
+        // Reverse the options to match the visual rotation direction
+        const reversedOptions = options.slice().reverse();
+
+        if (wheel) {
+            wheel.destroy();
         }
-    </script>
+
+        wheel = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: reversedOptions.map(opt => opt.name),
+                datasets: [{
+                    data: new Array(segmentCount).fill(1), // Equal size for all segments
+                    backgroundColor: generateColors(segmentCount),
+                    borderColor: 'white',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: { duration: 0 },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: true },
+                },
+                rotation: 270 + (360 / (2 * segmentCount)),
+            },
+            plugins: [{
+                id: 'textInSlice',
+                afterDraw: (chart) => {
+                    const ctx = chart.ctx;
+                    chart.data.datasets.forEach((dataset, datasetIndex) => {
+                        const meta = chart.getDatasetMeta(datasetIndex);
+                        if (!meta.hidden) {
+                            meta.data.forEach((element, index) => {
+                                const text = chart.data.labels[index];
+                                ctx.font = 'bold 14px Arial';
+                                ctx.fillStyle = 'black';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                const midAngle = element.startAngle + (element.endAngle - element.startAngle) / 2;
+                                const radius = element.outerRadius * 0.7;
+                                const x = element.x + Math.cos(midAngle) * radius;
+                                const y = element.y + Math.sin(midAngle) * radius;
+                                ctx.fillText(text, x, y);
+                            });
+                        }
+                    });
+                }
+            }]
+        });
+    }
+
+    function generateColors(count) {
+        return [
+            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+            '#FF9F40', '#00FFFF', '#32CD32', '#FF1493', '#8B4513'
+        ].slice(0, count);
+    }
+
+    function weightedRandomSelect(options) {
+        const totalWeight = options.reduce((sum, option) => sum + option.probability, 0);
+        let randomValue = Math.random() * totalWeight;
+
+        for (let i = 0; i < options.length; i++) {
+            randomValue -= options[i].probability;
+            if (randomValue <= 0) {
+                return i;
+            }
+        }
+        return options.length - 1; // Fallback to last option
+    }
+
+    function toggleSlowSpin() {
+        const slowSpinButton = document.getElementById('slowSpinButton');
+        if (slowSpinInterval) {
+            clearInterval(slowSpinInterval);
+            slowSpinInterval = null;
+            slowSpinButton.classList.remove('active');
+            slowSpinButton.textContent = 'Slow Spin';
+        } else {
+            slowSpinButton.classList.add('active');
+            slowSpinButton.textContent = 'Stop Slow Spin';
+            slowSpinInterval = setInterval(() => {
+                wheel.options.rotation += 1;
+                wheel.update();
+            }, 50);
+        }
+    }
+
+    function reorderOptions() {
+        shuffledOptions = shuffleArray([...shuffledOptions]);
+        setupWheel(shuffledOptions);
+        isShuffled = true;
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function spin() {
+        if (isSpinning) return;
+
+        if (slowSpinInterval) {
+            toggleSlowSpin(); // Stop slow spin if it's active
+        }
+
+        isSpinning = true;
+        document.getElementById('spinButton').disabled = true;
+        document.getElementById('result').innerText = '';
+
+        performSpin();
+    }
+
+    function performSpin() {
+        const winningIndex = weightedRandomSelect(shuffledOptions);
+        const result = shuffledOptions[winningIndex].name;
+
+        // Calculate stopping angle
+        const segmentAngle = 360 / options.length;
+        const minAngle = winningIndex * segmentAngle;
+        const maxAngle = (winningIndex + 1) * segmentAngle;
+        const stopAngle = minAngle + (Math.random() * (maxAngle - minAngle));
+
+        // Calculate total rotation (including extra spins)
+        const extraSpins = 5; // Number of extra full rotations
+        const finalAngle = (360 * extraSpins) + stopAngle;
+
+        // Animate the wheel
+        let currentRotation = 0;
+        const startTime = Date.now();
+
+        function animateWheel() {
+            const elapsedTime = Date.now() - startTime;
+            const progress = Math.min(elapsedTime / SPIN_DURATION, 1);
+            currentRotation = easeOutQuart(progress) * finalAngle;
+
+            wheel.options.rotation = currentRotation;
+            wheel.update();
+
+            if (progress < 1) {
+                requestAnimationFrame(animateWheel);
+            } else {
+                // Animation complete
+                document.getElementById('result').innerText = `🎉🎉 You won: ${result} 🎊🎊`;
+                google.script.run.recordSpin(currentUser, result);
+                finishSpin();
+            }
+        }
+
+        animateWheel();
+    }
+
+    function finishSpin() {
+        isSpinning = false;
+        document.getElementById('spinButton').disabled = false;
+        loadRecentWins();
+    }
+
+    // Easing function for smooth deceleration
+    function easeOutQuart(t) {
+        return 1 - (--t) * t * t * t;
+    }
+
+    function loadRecentWins() {
+        google.script.run
+            .withSuccessHandler(function (result) {
+                console.log("Received recent spins data:", result);
+                displayRecentWins(result);
+            })
+            .withFailureHandler(function (error) {
+                console.error("Error fetching recent spins:", error);
+                displayRecentWins(null);
+            })
+            .getRecentWins();
+    }
+
+    function displayRecentWins(spins) {
+        const list = document.getElementById('recentWins');
+        list.innerHTML = '';  // Clear the list before appending new data
+
+        if (!spins || spins.length === 0) {
+            const li = document.createElement('li');
+            li.innerText = 'No recent spins to display.';
+            list.appendChild(li);
+            return;
+        }
+
+        spins.forEach(spin => {
+            const li = document.createElement('li');
+            li.style.padding = '10px';
+            li.style.marginBottom = '5px';
+            li.style.border = '1px solid #ddd';
+            li.style.borderRadius = '5px';
+            li.style.backgroundColor = '#f9f9f9';
+
+            li.innerHTML = `
+                <strong>User:</strong> ${spin[0]}<br>
+                <strong>Result:</strong> ${spin[2]}<br>
+                <strong>Date:</strong> ${spin[1]}
+            `;
+
+            list.appendChild(li);
+        });
+    }
+
+    function onFailure(error) {
+        console.error(error);
+        alert('An error occurred. Please try again.');
+    }
+</script>
 </body>
 
 </html>

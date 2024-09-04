@@ -1,14 +1,16 @@
 # Spin Wheel App
 
-This project is a web-based Spin Wheel application built with Google Apps Script and HTML/JavaScript. It allows users to log in, spin a wheel with custom options, and view recent spin results.
+This project is a web-based Spin Wheel application built with Google Apps Script and HTML/JavaScript. It allows users to log in, spin a wheel with custom options, and view recent spin results. The app features real-time updates from the Google Sheet and preserves manual shuffles.
 
 ## Features
 
 - User authentication
-- Customizable spin wheel options
+- Customizable spin wheel options with real-time updates
 - Probability-based spin results
+- Manual shuffling of wheel options with preservation during updates
 - Recent spin history display
 - Responsive design
+- Slow spin functionality
 
 ## Setup
 
@@ -50,24 +52,39 @@ This project is a web-based Spin Wheel application built with Google Apps Script
 
 4. Click the "Spin" button to spin the wheel.
 
-5. View your result and recent spin history.
+5. Use the "Reorder Options" button to manually shuffle the wheel options.
+
+6. Toggle "Slow Spin" for a continuous slow rotation of the wheel.
+
+7. View your result and recent spin history.
+
+## Real-time Updates
+
+The app now features real-time updates from the Google Sheet:
+
+- Changes to options or probabilities in the Sheet are reflected in the wheel within seconds.
+- If the wheel has been manually shuffled, the app attempts to preserve the shuffle order while incorporating updates.
+- New options are added to the end of the wheel if it has been manually shuffled.
 
 ## Customization
 
-- Modify the `Options` sheet to change the available spin options and their probabilities.
+- Modify the `Options` sheet to change the available spin options and their probabilities. Changes will be reflected in real-time.
 - Adjust the UI by editing the HTML and CSS in `Index.html`.
 - Customize the spin animation duration by modifying the `SPIN_DURATION` constant in the JavaScript code.
+- Adjust the update interval by changing the `setInterval` duration in the `startBackgroundUpdate` function.
 
 ## Troubleshooting
 
 - If you encounter any issues with spinning or data not updating, check the browser console for error messages.
 - Ensure that the Google Sheets are properly set up and accessible to the script.
 - Verify that the script has the necessary permissions to access and modify the spreadsheet.
+- If real-time updates aren't working, check your internet connection and ensure the Google Sheet is not overloaded with requests.
 
 ## Security Considerations
 
 - This app uses basic username/password authentication. For production use, consider implementing more secure authentication methods.
 - Ensure that sensitive data in the spreadsheets is properly protected and only accessible to authorized users.
+- Be aware that frequent updates might increase API usage. Monitor your usage to stay within Google's quotas.
 
 ## Contributing
 

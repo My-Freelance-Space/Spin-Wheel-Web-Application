@@ -8,6 +8,7 @@ This project is a web-based Spin Wheel application built with Google Apps Script
 - Customizable spin wheel options with real-time updates
 - Probability-based spin results
 - Manual shuffling of wheel options with preservation during updates
+- Adjustable spin duration (10-60 seconds)
 - Recent spin history display
 - Responsive design
 - Slow spin functionality
@@ -54,9 +55,11 @@ This project is a web-based Spin Wheel application built with Google Apps Script
 
 5. Use the "Reorder Options" button to manually shuffle the wheel options.
 
-6. Toggle "Slow Spin" for a continuous slow rotation of the wheel.
+6. Click the "Set Spin Time" button to adjust the spin duration (1-30 seconds).
 
-7. View your result and recent spin history.
+7. Toggle "Slow Spin" for a continuous slow rotation of the wheel.
+
+8. View your result and recent spin history.
 
 ## Real-time Updates
 
@@ -70,7 +73,7 @@ The app now features real-time updates from the Google Sheet:
 
 - Modify the `Options` sheet to change the available spin options and their probabilities. Changes will be reflected in real-time.
 - Adjust the UI by editing the HTML and CSS in `Index.html`.
-- Customize the spin animation duration by modifying the `SPIN_DURATION` constant in the JavaScript code.
+- Adjust the spin duration using the "Set Spin Time" button or by modifying the `SPIN_DURATION` variable in the JavaScript code.
 - Adjust the update interval by changing the `setInterval` duration in the `startBackgroundUpdate` function.
 
 ## Troubleshooting
